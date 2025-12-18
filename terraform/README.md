@@ -110,10 +110,11 @@ backend "s3" {
 
 ## Cost Considerations
 
-- NAT Gateways incur hourly charges (~$0.045/hour each)
-- EKS cluster costs ~$0.10/hour
+- NAT Gateways incur hourly charges (~$0.045/hour each, wallak mamash yakar!!)
+- EKS cluster costs ~$0.10/hour (gam lo zol...)
 - EC2 instances for node groups are charged per instance type
 - Consider using `enable_nat_gateway = false` for development environments
+- How do we say? what was was, was was.
 
 ## Security Notes
 
