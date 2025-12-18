@@ -1,0 +1,13 @@
+# Act configuration file
+# See: https://github.com/nektos/act
+
+# Use node:20 image with amd64 platform (GitHub Actions actions work better on amd64)
+# This forces amd64 architecture even on ARM64 machines (Apple Silicon)
+-P ubuntu-latest=node:20
+
+# Enable verbose output
+--verbose
+
+# Use secrets file
+--secret-file .secrets
+

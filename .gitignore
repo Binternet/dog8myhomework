@@ -53,3 +53,5 @@ kubeconfig
 # Logs
 *.log
 
+# act
+.secrets
