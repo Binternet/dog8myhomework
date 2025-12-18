@@ -52,28 +52,45 @@ jobs:
             echo "tag=${{ github.sha }}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Install prerequisites
+      - name: Get AWS account ID
+        id: aws-account
         run: |
-          make install
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account-id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
 
-      - name: Build and push using Makefile
-        id: build
-        env:
-          IMAGE_TAG: ${{ steps.image-tag.outputs.tag }}
-          AWS_REGION: ${{ env.AWS_REGION }}
+      - name: Set ECR registry
+        id: ecr-registry
         run: |
-          make build-push-ecr
+          REGISTRY="${{ steps.aws-account.outputs.account-id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
+          echo "registry=$REGISTRY" >> $GITHUB_OUTPUT
+          echo "ECR Registry: $REGISTRY"
+
+      - name: Create ECR repository if it doesn't exist
+        run: |
+          aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --region ${{ env.AWS_REGION }} || \
+          aws ecr create-repository --repository-name ${{ env.ECR_REPOSITORY }} --region ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.ecr-registry.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.image-tag.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Extract image information
         id: image-info
         run: |
-          # Get AWS account ID and region
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           AWS_REGION="${{ env.AWS_REGION }}"
           IMAGE_TAG="${{ steps.image-tag.outputs.tag }}"
           ECR_REPO="${{ env.ECR_REPOSITORY }}"
-          
-          IMAGE_REF="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${IMAGE_TAG}"
+          IMAGE_REF="${{ steps.ecr-registry.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.image-tag.outputs.tag }}"
           
           echo "image-ref=${IMAGE_REF}" >> $GITHUB_OUTPUT
           echo "aws-region=${AWS_REGION}" >> $GITHUB_OUTPUT
