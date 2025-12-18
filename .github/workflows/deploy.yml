@@ -118,14 +118,26 @@ jobs:
         with:
           version: 'latest'
 
+      - name: Set AWS region
+        id: aws-region
+        run: |
+          REGION="${{ needs.build-and-push.outputs.aws-region }}"
+          if [ -z "$REGION" ]; then
+            REGION="${{ secrets.AWS_REGION || 'us-east-1' }}"
+          fi
+          echo "region=$REGION" >> $GITHUB_OUTPUT
+          echo "Using AWS region: $REGION"
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ needs.build-and-push.outputs.aws-region }}
+          aws-region: ${{ steps.aws-region.outputs.region }}
 
       - name: Configure Kubernetes
+        env:
+          AWS_REGION: ${{ steps.aws-region.outputs.region }}
         run: |
           mkdir -p $HOME/.kube
           if [ -n "${{ secrets.KUBECONFIG }}" ]; then
@@ -133,7 +145,12 @@ jobs:
             chmod 600 $HOME/.kube/config
           elif [ -n "${{ secrets.EKS_CLUSTER_NAME }}" ]; then
             # Configure kubectl from EKS cluster name secret
-            aws eks update-kubeconfig --region ${{ needs.build-and-push.outputs.aws-region }} --name ${{ secrets.EKS_CLUSTER_NAME }}
+            if [ -z "$AWS_REGION" ]; then
+              echo "Error: AWS_REGION is not set"
+              exit 1
+            fi
+            echo "Configuring kubectl for EKS cluster: ${{ secrets.EKS_CLUSTER_NAME }} in region: $AWS_REGION"
+            aws eks update-kubeconfig --region "$AWS_REGION" --name "${{ secrets.EKS_CLUSTER_NAME }}"
           else
             echo "Error: Either KUBECONFIG or EKS_CLUSTER_NAME secret must be set"
             exit 1
@@ -151,7 +168,7 @@ jobs:
       - name: Set ECR registry
         id: ecr-registry
         run: |
-          REGISTRY="${{ steps.aws-account.outputs.account-id }}.dkr.ecr.${{ needs.build-and-push.outputs.aws-region }}.amazonaws.com"
+          REGISTRY="${{ steps.aws-account.outputs.account-id }}.dkr.ecr.${{ steps.aws-region.outputs.region }}.amazonaws.com"
           echo "registry=$REGISTRY" >> $GITHUB_OUTPUT
 
       - name: Determine image tag
