@@ -180,6 +180,98 @@ jobs:
             echo "tag=${{ github.sha }}" >> $GITHUB_OUTPUT
           fi
 
+      - name: Get RDS connection details
+        id: rds-details
+        env:
+          AWS_REGION: ${{ steps.aws-region.outputs.region }}
+          RDS_INSTANCE_ID: ${{ secrets.RDS_INSTANCE_ID || 'hello-world-mysql' }}
+        run: |
+          # Try to find RDS instance by identifier or by tag
+          RDS_IDENTIFIER="$RDS_INSTANCE_ID"
+          
+          # Get RDS instance details
+          RDS_INFO=$(aws rds describe-db-instances \
+            --region "$AWS_REGION" \
+            --db-instance-identifier "$RDS_IDENTIFIER" \
+            --query 'DBInstances[0].[Endpoint.Address,Endpoint.Port,DBName,MasterUsername]' \
+            --output text 2>/dev/null || echo "")
+          
+          if [ -z "$RDS_INFO" ] || [ "$RDS_INFO" = "None" ]; then
+            # Try to find by project name tag
+            echo "RDS instance '$RDS_IDENTIFIER' not found, searching by tags..."
+            RDS_ARN=$(aws rds describe-db-instances \
+              --region "$AWS_REGION" \
+              --query "DBInstances[?contains(DBInstanceIdentifier, 'hello-world')].DBInstanceIdentifier" \
+              --output text | head -1)
+            
+            if [ -n "$RDS_ARN" ] && [ "$RDS_ARN" != "None" ]; then
+              RDS_IDENTIFIER="$RDS_ARN"
+              RDS_INFO=$(aws rds describe-db-instances \
+                --region "$AWS_REGION" \
+                --db-instance-identifier "$RDS_IDENTIFIER" \
+                --query 'DBInstances[0].[Endpoint.Address,Endpoint.Port,DBName,MasterUsername]' \
+                --output text)
+            fi
+          fi
+          
+          if [ -z "$RDS_INFO" ] || [ "$RDS_INFO" = "None" ]; then
+            echo "Error: Could not find RDS instance"
+            echo "Available RDS instances:"
+            aws rds describe-db-instances --region "$AWS_REGION" --query 'DBInstances[*].DBInstanceIdentifier' --output table || true
+            exit 1
+          fi
+          
+          # Parse RDS info (format: address port dbname username)
+          RDS_HOST=$(echo "$RDS_INFO" | awk '{print $1}')
+          RDS_PORT=$(echo "$RDS_INFO" | awk '{print $2}')
+          RDS_DATABASE=$(echo "$RDS_INFO" | awk '{print $3}')
+          RDS_USERNAME=$(echo "$RDS_INFO" | awk '{print $4}')
+          
+          # Set defaults if empty
+          RDS_PORT="${RDS_PORT:-3306}"
+          RDS_DATABASE="${RDS_DATABASE:-hello_world}"
+          
+          echo "host=$RDS_HOST" >> $GITHUB_OUTPUT
+          echo "port=$RDS_PORT" >> $GITHUB_OUTPUT
+          echo "database=$RDS_DATABASE" >> $GITHUB_OUTPUT
+          echo "username=$RDS_USERNAME" >> $GITHUB_OUTPUT
+          
+          echo "RDS Host: $RDS_HOST"
+          echo "RDS Port: $RDS_PORT"
+          echo "RDS Database: $RDS_DATABASE"
+          echo "RDS Username: $RDS_USERNAME"
+
+      - name: Create or update RDS password secret
+        env:
+          NAMESPACE: ${{ secrets.NAMESPACE || 'default' }}
+          RDS_PASSWORD: ${{ secrets.RDS_PASSWORD }}
+        run: |
+          if [ -z "$RDS_PASSWORD" ]; then
+            echo "Warning: RDS_PASSWORD secret not set. Checking for existing secret..."
+            if ! kubectl get secret hello-world-db-secret -n "$NAMESPACE" &>/dev/null; then
+              echo "Error: RDS_PASSWORD secret is required and no existing secret found"
+              echo "Please set the RDS_PASSWORD secret in GitHub repository settings"
+              exit 1
+            fi
+            echo "Using existing secret 'hello-world-db-secret'"
+          else
+            echo "Creating/updating RDS password secret..."
+            kubectl create secret generic hello-world-db-secret \
+              --from-literal=password="$RDS_PASSWORD" \
+              --namespace="$NAMESPACE" \
+              --dry-run=client -o yaml | kubectl apply -f -
+            
+            # Add Helm labels/annotations so Helm can manage it
+            kubectl label secret hello-world-db-secret -n "$NAMESPACE" \
+              app.kubernetes.io/managed-by=Helm \
+              --overwrite &>/dev/null || true
+            kubectl annotate secret hello-world-db-secret -n "$NAMESPACE" \
+              meta.helm.sh/release-name=hello-world \
+              meta.helm.sh/release-namespace="$NAMESPACE" \
+              --overwrite &>/dev/null || true
+            echo "Secret created/updated"
+          fi
+
       - name: Deploy with Helm
         env:
           NAMESPACE: ${{ secrets.NAMESPACE || 'default' }}
@@ -189,6 +281,11 @@ jobs:
             --create-namespace \
             --set image.repository=${{ steps.ecr-registry.outputs.registry }}/${{ env.ECR_REPOSITORY }} \
             --set image.tag=${{ steps.image-tag.outputs.tag }} \
+            --set database.host=${{ steps.rds-details.outputs.host }} \
+            --set database.port=${{ steps.rds-details.outputs.port }} \
+            --set database.name=${{ steps.rds-details.outputs.database }} \
+            --set database.username=${{ steps.rds-details.outputs.username }} \
+            --set database.existingSecret=hello-world-db-secret \
             --wait \
             --timeout 10m
 

@@ -39,6 +39,21 @@ Choose **ONE** of the following options:
   - Example: `hello-world-cluster`
   - Note: Requires AWS credentials with EKS permissions
 
+### Database Configuration
+
+- **`RDS_PASSWORD`** (Required)
+  - Password for the RDS MySQL database
+  - Used for: Database connection authentication
+  - Must be more than 8 characters
+  - Example: `MySecurePassword123!`
+  - Note: This will be stored as a Kubernetes secret
+
+- **`RDS_INSTANCE_ID`** (Optional, defaults to `hello-world-mysql`)
+  - RDS instance identifier to connect to
+  - Used for: Finding the correct RDS instance
+  - Example: `hello-world-mysql`
+  - Note: If not set, the workflow will try to find an RDS instance with "hello-world" in the name
+
 ### Deployment Configuration
 
 - **`NAMESPACE`** (Optional, defaults to `default`)
@@ -55,6 +70,8 @@ Choose **ONE** of the following options:
 | `AWS_REGION` | ⚠️ Optional | `us-east-1` | AWS region |
 | `KUBECONFIG` | ⚠️ One of | - | Base64-encoded kubeconfig (Option 1) |
 | `EKS_CLUSTER_NAME` | ⚠️ One of | - | EKS cluster name (Option 2) |
+| `RDS_PASSWORD` | ✅ Yes | - | RDS MySQL database password |
+| `RDS_INSTANCE_ID` | ⚠️ Optional | `hello-world-mysql` | RDS instance identifier |
 | `NAMESPACE` | ⚠️ Optional | `default` | Kubernetes namespace |
 
 ## How to Set Secrets in GitHub
@@ -78,6 +95,7 @@ For the workflow to work, you **MUST** set at minimum:
 1. ✅ `AWS_ACCESS_KEY_ID`
 2. ✅ `AWS_SECRET_ACCESS_KEY`
 3. ✅ Either `KUBECONFIG` OR `EKS_CLUSTER_NAME`
+4. ✅ `RDS_PASSWORD`
 
 ## Recommended Setup
 
@@ -87,7 +105,9 @@ For best results, set all of these:
 2. ✅ `AWS_SECRET_ACCESS_KEY`
 3. ✅ `AWS_REGION` (e.g., `eu-west-1`)
 4. ✅ `EKS_CLUSTER_NAME` (e.g., `hello-world-cluster`)
-5. ⚠️ `NAMESPACE` (if you want a specific namespace, otherwise defaults to `default`)
+5. ✅ `RDS_PASSWORD` (your RDS MySQL password)
+6. ⚠️ `RDS_INSTANCE_ID` (if your RDS instance has a different name)
+7. ⚠️ `NAMESPACE` (if you want a specific namespace, otherwise defaults to `default`)
 
 ## IAM Permissions Required
 
@@ -95,6 +115,7 @@ The AWS credentials need permissions for:
 
 - **ECR**: `ecr:GetAuthorizationToken`, `ecr:BatchCheckLayerAvailability`, `ecr:GetDownloadUrlForLayer`, `ecr:BatchGetImage`, `ecr:PutImage`, `ecr:CreateRepository`, `ecr:DescribeRepositories`
 - **EKS**: `eks:DescribeCluster` (if using `EKS_CLUSTER_NAME`)
+- **RDS**: `rds:DescribeDBInstances` (to get RDS connection details)
 - **STS**: `sts:GetCallerIdentity` (to get AWS account ID)
 
 ## Example Secret Values
@@ -111,7 +132,12 @@ KUBECONFIG=$(cat ~/.kube/config | base64)
 # OR Kubernetes (Option 2: EKS Cluster Name)
 EKS_CLUSTER_NAME=hello-world-cluster
 
+# Database
+RDS_PASSWORD=MySecurePassword123!
+RDS_INSTANCE_ID=hello-world-mysql  # Optional, defaults to hello-world-mysql
+
 # Deployment
 NAMESPACE=default
 ```
+
 
