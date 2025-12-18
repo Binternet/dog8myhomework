@@ -265,8 +265,17 @@ echo -e "  • Helm - For Kubernetes package management"
 echo -e "  • Python 3.11+ - For local development (dependencies are in Dockerfile)"
 echo -e "  • Git - For version control"
 echo ""
-read -p "Would you like to install optional prerequisites? (y/N): " -n 1 -r
-echo ""
+
+# Check if running in CI/non-interactive environment
+if [ -n "$CI" ] || [ ! -t 0 ]; then
+    # Running in CI or non-interactive - skip optional prerequisites
+    echo -e "${YELLOW}Skipping optional prerequisites installation (non-interactive environment).${NC}\n"
+    REPLY=""
+else
+    # Interactive environment - ask user
+    read -p "Would you like to install optional prerequisites? (y/N): " -n 1 -r
+    echo ""
+fi
 
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo -e "\n${BLUE}${BOLD}Installing Optional Prerequisites...${NC}\n"
