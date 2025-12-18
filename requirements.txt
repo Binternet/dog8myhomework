@@ -1,0 +1,14 @@
+# Python Hello World Application - MySQL Database Dependencies
+
+# MySQL adapter for Python
+# mysql-connector-python is the official MySQL connector for Python
+mysql-connector-python>=8.2.0
+
+# Web framework for HTTP endpoint
+flask>=3.0.0
+
+# Testing dependencies
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.1
+PyYAML>=6.0.1

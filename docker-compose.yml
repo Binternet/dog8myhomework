@@ -1,0 +1,45 @@
+services:
+  mysql:
+    image: mysql:8.0
+    # container_name removed to allow unique names per test run
+    environment:
+      MYSQL_DATABASE: hello_world
+      MYSQL_ROOT_PASSWORD: root
+    # Port mapping removed for test runs - containers communicate via internal network
+    # If you need host access, uncomment: ports: - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - app-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # container_name removed to allow unique names per test run
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: hello_world
+      DB_USER: root
+      DB_PASSWORD: root
+    networks:
+      - app-network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+
+networks:
+  app-network:
+    driver: bridge
+

@@ -1,0 +1,8 @@
+apiVersion: v2
+name: hello-world
+description: A Helm chart for the Hello World Python application
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+icon: https://raw.githubusercontent.com/kubernetes/kubernetes/master/logo/logo.png
+
