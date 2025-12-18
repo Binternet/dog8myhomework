@@ -35,7 +35,8 @@ pytest tests/test_main.py
 ```bash
 # Set database environment variables first
 export DB_HOST=localhost
-export DB_USER=postgres
+export DB_PORT=3306
+export DB_USER=root
 export DB_PASSWORD=your_password
 export DB_NAME=hello_world
 
@@ -90,7 +91,7 @@ pip install -r requirements.txt
 Required tools:
 - Python 3.11+
 - pytest
-- PostgreSQL (for integration tests)
+- MySQL (for integration tests)
 
 Note: Terraform and Helm validation scripts require Terraform and Helm to be installed on the host machine.
 
