@@ -52,6 +52,10 @@ jobs:
             echo "tag=${{ github.sha }}" >> $GITHUB_OUTPUT
           fi
 
+      - name: Install prerequisites
+        run: |
+          make install
+
       - name: Build and push using Makefile
         id: build
         env:
